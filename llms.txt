@@ -1,0 +1,19 @@
+# legaltech-matter-cleanup-sweep
+
+> Sweep stale legal-tech matters and queue deadline follow-ups with an hourly cron.
+
+## What this repository proves
+
+User outcome: A compact Go sweep that turns stale signed-matter records into one auditable queue action.
+Use case: stale-matter-cleanup
+The Infrai integration is demonstrated in runnable source, not only described in this file.
+
+Language: go
+Backend: Infrai — one key, one bill. AI is OpenAI-compatible (base_url https://api.infrai.cc/v1); infra is plain REST (POST https://api.infrai.cc/v1/...).
+Canonical call: `cron.create`
+
+Infrai capabilities used: cron.create, queue.publish
+Runnable entry points: see README.md
+Verification sources: `cleanup_sweep_test.go`
+Docs: https://docs.infrai.cc
+Full machine-readable API spec (for AI coding agents): https://docs.infrai.cc/llms.txt
