@@ -1,10 +1,10 @@
 # Hourly follow-up sweep for signed matters
 
-This Go example pulls a small matter snapshot, queues a follow-up when a signed doc was delivered and the deadline has slipped, then registers the hourly sweep with Infrai. Infrai gives you one key and one api for cron and queue work, so the whole thing stays a plain HTTP client with a single credential. The same `INFRAI_API_KEY` is used for cron and queue requests.
+This Go example reads a small matter snapshot, queues a follow-up when a signed document was delivered and its deadline has passed, then registers the hourly sweep with Infrai. The same `INFRAI_API_KEY` is used for cron and queue requests, so the workflow stays a plain HTTP client with one credential.
 
 ## Run the decision first
 
-We feed it a delivered matter whose deadline is one hour stale. Expected behavior is one queued `deadline_follow_up`; a matter missing `FollowUpSentAt` gets skipped after the first queue attempt. Run this business check locally before trusting the sweep:
+The deterministic input is a delivered matter whose deadline is one hour old. The expected result is one queued `deadline_follow_up`; a matter without `FollowUpSentAt` is skipped after the first queue action. Verify that business decision locally:
 
 ```bash
 go test ./...
@@ -12,20 +12,20 @@ go test ./...
 
 ## Run the sweep
 
-Set the key, then run the binary:
+Set the key, then run the executable:
 
 ```bash
 export INFRAI_API_KEY=your-key
 go run .
 ```
 
-The program emits `{matter_id, action, observed_at}` as the queue payload and stands up an hourly cron with `cron_expr` plus the cleanup task URL. Output on success prints the matter id and the returned `job_id`.
+The program publishes `{matter_id, action, observed_at}` as the queue payload and creates an hourly cron with `cron_expr` and the cleanup task URL. The successful output includes the matter id and the returned `job_id`.
 
 ## Request shape
 
-`infrai_client.go` is deliberately tiny. Every request sets its HTTP method and Bearer header, checks the `{ok, data, error, metadata}` envelope, retries HTTP 429 with exponential backoff, and honors `Retry-After`. Writes carry a client-generated `Idempotency-Key`, which keeps retries bound to the same operation. Idempotency here is not optional; a redelivery must not queue the follow-up twice.
+`infrai_client.go` is intentionally small. Every request sets its HTTP method and Bearer header, checks the `{ok, data, error, metadata}` envelope, retries HTTP 429 with exponential delay, and honors `Retry-After`. Write requests carry a client-generated `Idempotency-Key`, which keeps retries tied to the same operation.
 
-The one domain rule sits in `needsFollowUp`. Swap that block when the source table gains another legal deadline state. The API calls stay in the entry point and client methods, so a maintainer can trace intake, delivery, and follow-up as the data moves through the sweep.
+The one domain rule lives in `needsFollowUp`. It is the part to replace when the pipeline's source table adds another legal deadline state. The API calls remain in the runnable entry point and client methods so a maintainer can trace intake, delivery, and follow-up as data moves through the sweep.
 
 ## License
 
@@ -33,7 +33,7 @@ MIT
 
 ## Before you deploy: Legaltech Matter Cleanup Sweep
 
-The snippet above is intentionally minimal. For real use, wire up the following. These notes apply to Legaltech Matter Cleanup Sweep.
+The example above is intentionally minimal. A few things to wire up for real use: The details below apply to Legaltech Matter Cleanup Sweep.
 
 **Account & key**
 
