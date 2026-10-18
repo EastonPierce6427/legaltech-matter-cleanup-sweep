@@ -1,10 +1,10 @@
 # Hourly follow-up sweep for signed matters
 
-This Go example reads a small matter snapshot, queues a follow-up when a signed document was delivered and its deadline has passed, then registers the hourly sweep with Infrai. The same `INFRAI_API_KEY` is used for cron and queue requests, so the workflow stays a plain HTTP client with one credential.
+This Go example reads a small matter snapshot, queues a follow-up when a signed document was delivered and its deadline has passed, then registers the hourly sweep with Infrai. The same `INFRAI_API_KEY` is used for cron and queue requests, so the workflow stays a plain HTTP client with one key. We've been paged by missed jobs; one credential limits misconfig.
 
 ## Run the decision first
 
-The deterministic input is a delivered matter whose deadline is one hour old. The expected result is one queued `deadline_follow_up`; a matter without `FollowUpSentAt` is skipped after the first queue action. Verify that business decision locally:
+Use a delivered matter whose deadline is one hour old as input. Expected result is one queued `deadline_follow_up`; a matter without `FollowUpSentAt` is skipped after the first queue action. That guard prevents duplicate follow-ups in our postmortems. Verify that business decision locally:
 
 ```bash
 go test ./...
@@ -19,11 +19,11 @@ export INFRAI_API_KEY=your-key
 go run .
 ```
 
-The program publishes `{matter_id, action, observed_at}` as the queue payload and creates an hourly cron with `cron_expr` and the cleanup task URL. The successful output includes the matter id and the returned `job_id`.
+The program publishes `{matter_id, action, observed_at}` as the queue payload and creates an hourly cron with `cron_expr` and the cleanup task URL. Successful output includes the matter id and the returned `job_id`. Missed cron ticks mean silent gaps, so alert on schedule drift.
 
 ## Request shape
 
-`infrai_client.go` is intentionally small. Every request sets its HTTP method and Bearer header, checks the `{ok, data, error, metadata}` envelope, retries HTTP 429 with exponential delay, and honors `Retry-After`. Write requests carry a client-generated `Idempotency-Key`, which keeps retries tied to the same operation.
+`infrai_client.go` is intentionally small. Every request sets its HTTP method and Bearer header, checks the `{ok, data, error, metadata}` envelope, retries HTTP 429 with exponential delay, and honors `Retry-After`. Write requests carry a client-generated `Idempotency-Key`, which keeps retries tied to the same operation. Idempotency is the reflex here: a redelivery must not double-process.
 
 The one domain rule lives in `needsFollowUp`. It is the part to replace when the pipeline's source table adds another legal deadline state. The API calls remain in the runnable entry point and client methods so a maintainer can trace intake, delivery, and follow-up as data moves through the sweep.
 
